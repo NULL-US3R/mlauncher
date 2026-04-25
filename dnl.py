@@ -2,6 +2,7 @@ import urllib.request as req
 import json
 import os, glob
 import time
+import argparse
 
 from multiprocessing import Process
 def rjson(url):
@@ -44,6 +45,7 @@ def dllibs(libs):
     pr =[]
     for i in libs:
         path = 'libraries/' + i['downloads']['artifact']['path']
+        #print(json.dumps(i,indent=4))
         url = i['downloads']['artifact']['url']
         p = Process(target=dlfile,args=(url,path))
         pr.append(p)
@@ -52,19 +54,17 @@ def dllibs(libs):
         p.join()
 
 
-def download():
+def download(vername):
     man_url = 'https://piston-meta.mojang.com/mc/game/version_manifest_v2.json'
     man = rjson(man_url)
 
-    vername = man['latest']['release']
-
     ver = rjson(find_ver_url(man,vername))
+
+    dllibs(ver['libraries'])
 
     assets = rjson(ver['assetIndex']['url'])
 
     dlassets(assets)
-
-    dllibs(ver['libraries'])
 
     # download client
 
@@ -82,4 +82,9 @@ def download():
     os.system('chmod +x run.sh')
 
 
-download()
+prs = argparse.ArgumentParser()
+prs.add_argument('-v', '--version')
+
+args = prs.parse_args()
+
+download(args.version)
