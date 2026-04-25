@@ -1,6 +1,6 @@
 import urllib.request as req
 import json
-import os
+import os, glob
 import time
 
 from multiprocessing import Process
@@ -23,7 +23,7 @@ def dlfile(url,path):
             break
         except Exception as e:
             time.sleep(0.1)
-            print('retry ', url)
+            #print('retry ', url)
     print(path)
 
 def dlassets(assets):
@@ -51,23 +51,35 @@ def dllibs(libs):
     for p in pr:
         p.join()
 
-man_url = 'https://piston-meta.mojang.com/mc/game/version_manifest_v2.json'
-man = rjson(man_url)
 
-vername = man['latest']['release']
+def download():
+    man_url = 'https://piston-meta.mojang.com/mc/game/version_manifest_v2.json'
+    man = rjson(man_url)
 
-ver = rjson(find_ver_url(man,vername))
+    vername = man['latest']['release']
 
-assets = rjson(ver['assetIndex']['url'])
+    ver = rjson(find_ver_url(man,vername))
 
-dlassets(assets)
+    assets = rjson(ver['assetIndex']['url'])
 
-dllibs(ver['libraries'])
+    dlassets(assets)
 
-# download client
+    dllibs(ver['libraries'])
 
-url = ver['downloads']['client']['url']
+    # download client
 
-dlfile(url,'client.jar')
+    url = ver['downloads']['client']['url']
 
-#print(json.dumps(ver,indent=4))
+    dlfile(url,'client.jar')
+
+    classpath = ''
+    for f in glob.glob('**/*.jar',recursive=True):
+        classpath += f + ':'
+    
+    str_run = '#/bin/bash\n'+'java '+ '-cp ' + classpath + ' ' + ver['mainClass'] + " -accessToken 0 -version 30"
+    with open('run.sh', 'w') as f:
+        f.write(str_run)
+    os.system('chmod +x run.sh')
+
+
+download()
