@@ -4,6 +4,7 @@ import json
 import os, glob
 import time
 import argparse
+from zipfile import ZipFile
 
 import multiprocessing as mp
 from multiprocessing import Pool
@@ -47,14 +48,42 @@ def dlassets(assets):
 
 def dllibs(libs):
     print('downloading libs')
-    args = [
-       (
-           i['downloads']['artifact']['url'],
-           'libraries/' + i['downloads']['artifact']['path']
-       ) for i in libs
-    ]
+
+    try:
+        args = []
+        for i in libs:
+
+            if 'artifact' in i['downloads']:
+                args.append(
+                    (
+                        i['downloads']['artifact']['url'],
+                        'libraries/' + i['downloads']['artifact']['path']
+                    )
+                )
+            if 'classifiers' in i['downloads']:
+                for clsk in i['downloads']['classifiers'].keys():
+                    cls = i['downloads']['classifiers'][clsk]
+                    args.append(
+                        (
+                            cls['url'],
+                            'libraries/' + cls['path']
+                        )
+                    )
+
+
+
+    except Exception as e:
+        print(json.dumps(libs,indent=4))
+        raise e
     with Pool(processes=_PROCNUM) as pool:
         pool.starmap(dlfile,args)
+
+    for i in libs:
+        if 'classifiers' in i['downloads']:
+            for clsk in i['downloads']['classifiers'].keys():
+                cls = i['downloads']['classifiers'][clsk]
+                with ZipFile('libraries/' + cls['path'], 'r') as zf:
+                    zf.extractall(path='natives/')
 
 
 def download(vername):
@@ -79,7 +108,7 @@ def download(vername):
     for f in glob.glob('**/*.jar',recursive=True):
         classpath += f + ':'
 
-    str_run = '#/bin/bash\n'+'java '+ '-cp ' + classpath + ' ' + ver['mainClass'] + " -accessToken 0 -version 30"
+    str_run = '#/bin/bash\n'+'java '+ '-cp ' + classpath + ' -Djava.library.path=natives/ ' + ver['mainClass'] + " -accessToken 0 -version 30"
     with open('run.sh', 'w') as f:
         f.write(str_run)
     os.system('chmod +x run.sh')
@@ -87,7 +116,7 @@ def download(vername):
 
 if __name__ == '__main__':
     prs = argparse.ArgumentParser()
-    prs.add_argument('-v', '--version', help='specify the version that you want to download (may be buggy with older versions)')
+    prs.add_argument('-v', '--version', help='specify the version that you want to download')
     prs.add_argument('-p', '--procnum', help='specify the number of processes to download with (default 256)')
 
     args = prs.parse_args()
