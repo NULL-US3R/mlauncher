@@ -1,10 +1,17 @@
+#!/usr/bin/env python
 import urllib.request as req
 import json
 import os, glob
 import time
 import argparse
 
-from multiprocessing import Process
+import multiprocessing as mp
+from multiprocessing import Pool
+
+mp.set_start_method('fork')
+
+_PROCNUM = 256
+
 def rjson(url):
     return json.loads(req.urlopen(url).read().decode())
 
@@ -29,29 +36,25 @@ def dlfile(url,path):
 
 def dlassets(assets):
     print('downloading ass')
-    pr = []
-    for i in assets['objects'].keys():
-        hsh = assets['objects'][i]['hash']
-        b = hsh[:2]
-        url = 'https://resources.download.minecraft.net/'+b+'/'+hsh
-        p = Process(target=dlfile,args=(url,'assets/' + i))
-        pr.append(p)
-        p.start()
-    for p in pr:
-        p.join()
+    args = [
+        (
+            'https://resources.download.minecraft.net/'+assets['objects'][i]['hash'][:2]+'/'+assets['objects'][i]['hash'],
+            'assets/' + i
+        ) for i in assets['objects'].keys()
+    ]
+    with Pool(processes=_PROCNUM) as pool:
+        pool.starmap(dlfile,args)
 
 def dllibs(libs):
     print('downloading libs')
-    pr =[]
-    for i in libs:
-        path = 'libraries/' + i['downloads']['artifact']['path']
-        #print(json.dumps(i,indent=4))
-        url = i['downloads']['artifact']['url']
-        p = Process(target=dlfile,args=(url,path))
-        pr.append(p)
-        p.start()
-    for p in pr:
-        p.join()
+    args = [
+       (
+           i['downloads']['artifact']['url'],
+           'libraries/' + i['downloads']['artifact']['path']
+       ) for i in libs
+    ]
+    with Pool(processes=_PROCNUM) as pool:
+        pool.starmap(dlfile,args)
 
 
 def download(vername):
@@ -75,16 +78,21 @@ def download(vername):
     classpath = ''
     for f in glob.glob('**/*.jar',recursive=True):
         classpath += f + ':'
-    
+
     str_run = '#/bin/bash\n'+'java '+ '-cp ' + classpath + ' ' + ver['mainClass'] + " -accessToken 0 -version 30"
     with open('run.sh', 'w') as f:
         f.write(str_run)
     os.system('chmod +x run.sh')
 
 
-prs = argparse.ArgumentParser()
-prs.add_argument('-v', '--version')
+if __name__ == '__main__':
+    prs = argparse.ArgumentParser()
+    prs.add_argument('-v', '--version', help='specify the version that you want to download (may be buggy with older versions)')
+    prs.add_argument('-p', '--procnum', help='specify the number of processes to download with (default 256)')
 
-args = prs.parse_args()
+    args = prs.parse_args()
 
-download(args.version)
+    if(args.procnum):
+        _PROCNUM = args.procnum
+
+    download(args.version)
