@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import urllib.request as req
 import json
-import os, glob
+import os, glob, stat
 import time
 import argparse
 from zipfile import ZipFile
@@ -11,7 +11,7 @@ from multiprocessing import Pool
 
 mp.set_start_method('fork')
 
-_PROCNUM = 256
+_PROCNUM = 500
 
 def rjson(url):
     return json.loads(req.urlopen(url).read().decode())
@@ -31,7 +31,7 @@ def dlfile(url,path):
             req.urlretrieve(url,path)
             break
         except Exception as e:
-            time.sleep(0.1)
+            time.sleep(0.2)
             #print('retry ', url)
     print(path)
 
@@ -87,6 +87,8 @@ def dllibs(libs):
 
 
 def download(vername):
+    os.makedirs('versions/' + vername, exist_ok=True)
+    os.chdir('versions/' + vername)
     man_url = 'https://piston-meta.mojang.com/mc/game/version_manifest_v2.json'
     man = rjson(man_url)
 
@@ -108,10 +110,11 @@ def download(vername):
     for f in glob.glob('**/*.jar',recursive=True):
         classpath += f + ':'
 
-    str_run = '#/bin/bash\n'+'java '+ '-cp ' + classpath + ' -Djava.library.path=natives/ ' + ver['mainClass'] + " -accessToken 0 -version 30"
+    str_run = '#/bin/bash\n'+'java '+ '-cp ' + classpath + ' -Djava.library.path=natives/ ' + ver['mainClass'] + " -accessToken 0 -version 30 -userProperties {}"
     with open('run.sh', 'w') as f:
         f.write(str_run)
-    os.system('chmod +x run.sh')
+    #os.system('chmod +x run.sh')
+    os.chmod('run.sh', os.stat('run.sh').st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
 
 if __name__ == '__main__':
@@ -122,6 +125,9 @@ if __name__ == '__main__':
     args = prs.parse_args()
 
     if(args.procnum):
-        _PROCNUM = args.procnum
+        _PROCNUM = int(args.procnum)
 
-    download(args.version)
+    if(args.version):
+        download(args.version)
+    else:
+        print("THOU HAVEN'T GIVEN THE VERSION")
