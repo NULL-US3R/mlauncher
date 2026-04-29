@@ -106,15 +106,31 @@ def download(vername):
 
     dlfile(url,'client.jar')
 
+    # make run script
     classpath = ''
+    classpath_win = ''
     for f in glob.glob('**/*.jar',recursive=True):
         classpath += f + ':'
+        classpath_win += f + ';'
 
-    str_run = '#/bin/bash\n'+'java '+ '-cp ' + classpath + ' -Djava.library.path=natives/ ' + ver['mainClass'] + " -accessToken 0 -version 30 -userProperties {}"
+    str_run = '#/bin/bash\n'\
+    +'java '+ '-cp ' + classpath\
+    + ' -Djava.library.path=natives/ '\
+    + ver['mainClass']\
+    + " -accessToken 0 -version 30 -userProperties {}"
+
+    str_run_win = 'java '+ '-cp ' + classpath_win\
+    + ' -Djava.library.path=natives/ '\
+    + ver['mainClass']\
+    + " -accessToken 0 -version 30 -userProperties {}"
+
+
     with open('run.sh', 'w') as f:
         f.write(str_run)
-    #os.system('chmod +x run.sh')
+
     os.chmod('run.sh', os.stat('run.sh').st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+    with open('run.bat', 'w') as f:
+        f.write(str_run_win)
 
 
 if __name__ == '__main__':
