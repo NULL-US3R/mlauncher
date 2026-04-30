@@ -5,13 +5,14 @@ import os, glob, stat
 import time
 import argparse
 from zipfile import ZipFile
+import shutil
 
 import multiprocessing as mp
 from multiprocessing import Pool
 
-mp.set_start_method('fork')
+#mp.set_start_method('fork')
 
-_PROCNUM = 500
+_PROCNUM = 60
 
 def rjson(url):
     return json.loads(req.urlopen(url).read().decode())
@@ -22,7 +23,7 @@ def find_ver_url(man,vername):
             return i['url']
 
 def dlfile(url,path):
-    if(os.path.exists(path) and os.path.getsize(path)!=0):
+    if(os.path.exists(path)):
         #print('skip ', path)
         return
     os.makedirs(os.path.dirname(path) or '.',exist_ok=True)
@@ -35,18 +36,24 @@ def dlfile(url,path):
             #print('retry ', url)
     print(path)
 
-def dlassets(assets):
+def dlassets(assets, vername):
     print('downloading ass')
-    args = [
-        (
+    dls = []
+    for i in assets['objects'].keys():
+        dls.append((
             'https://resources.download.minecraft.net/'+assets['objects'][i]['hash'][:2]+'/'+assets['objects'][i]['hash'],
-            'assets/' + i
-        ) for i in assets['objects'].keys()
-    ]
-    with Pool(processes=_PROCNUM) as pool:
-        pool.starmap(dlfile,args)
+            'assets/' + assets['objects'][i]['hash']
+        ))
 
-def dllibs(libs):
+    with Pool(processes=_PROCNUM) as pool:
+        pool.starmap(dlfile,dls)
+
+    for i in assets['objects'].keys():
+        pth = 'versions/' + vername + '/assets/' + i;
+        os.makedirs(os.path.dirname(pth), exist_ok=True)
+        shutil.copy('assets/' + assets['objects'][i]['hash'], pth)
+
+def dllibs(libs, vername):
     print('downloading libs')
 
     try:
@@ -60,6 +67,7 @@ def dllibs(libs):
                         'libraries/' + i['downloads']['artifact']['path']
                     )
                 )
+
             if 'classifiers' in i['downloads']:
                 for clsk in i['downloads']['classifiers'].keys():
                     cls = i['downloads']['classifiers'][clsk]
@@ -69,44 +77,51 @@ def dllibs(libs):
                             'libraries/' + cls['path']
                         )
                     )
-
-
-
     except Exception as e:
         print(json.dumps(libs,indent=4))
         raise e
+
     with Pool(processes=_PROCNUM) as pool:
         pool.starmap(dlfile,args)
+
+
+    for i in args:
+        pth = 'versions/' + vername + '/' + i[1];
+        os.makedirs(os.path.dirname(pth), exist_ok=True)
+        shutil.copy(i[1], pth)
+
+
 
     for i in libs:
         if 'classifiers' in i['downloads']:
             for clsk in i['downloads']['classifiers'].keys():
                 cls = i['downloads']['classifiers'][clsk]
-                with ZipFile('libraries/' + cls['path'], 'r') as zf:
-                    zf.extractall(path='natives/')
+                with ZipFile('versions/' + vername + '/libraries/' + cls['path'], 'r') as zf:
+                    zf.extractall(path='versions/' + vername + '/natives/')
 
 
 def download(vername):
     os.makedirs('versions/' + vername, exist_ok=True)
-    os.chdir('versions/' + vername)
+    #os.chdir('versions/' + vername)
     man_url = 'https://piston-meta.mojang.com/mc/game/version_manifest_v2.json'
     man = rjson(man_url)
 
     ver = rjson(find_ver_url(man,vername))
 
-    dllibs(ver['libraries'])
+    dllibs(ver['libraries'], vername)
 
     assets = rjson(ver['assetIndex']['url'])
 
-    dlassets(assets)
+    dlassets(assets, vername)
 
     # download client
 
     url = ver['downloads']['client']['url']
 
-    dlfile(url,'client.jar')
+    dlfile(url,'versions/' + vername + '/client.jar')
 
     # make run script
+    os.chdir('versions/' + vername)
     classpath = ''
     classpath_win = ''
     for f in glob.glob('**/*.jar',recursive=True):
