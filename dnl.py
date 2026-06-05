@@ -151,7 +151,7 @@ def download(vername):
 if __name__ == '__main__':
     prs = argparse.ArgumentParser()
     prs.add_argument('-v', '--version', help='specify the version that you want to download')
-    prs.add_argument('-p', '--procnum', help='specify the number of processes to download with (default 256)')
+    prs.add_argument('-p', '--procnum', help='specify the number of processes to download with (default 60)')
 
     args = prs.parse_args()
 
